@@ -164,12 +164,14 @@ io.on("connection", (socket) => {
                 env: {
                     ...process.env,
                     FORCE_COLOR: "1",
-                    NODE_OPTIONS: "--max-old-space-size=128",
-                    npm_config_audit: "false",
-                    npm_config_fund: "false",
-                    npm_config_prefer_offline: "true"
+                    NPM_CONFIG_AUDIT: "false",
+                    NPM_CONFIG_FUND: "false",
+                    NPM_CONFIG_PROGRESS: "false",
+                    NPM_CONFIG_PREFER_OFFLINE: "true"
                 }
             })
+
+            send(socket, "\r\n\x1b[1;36m💡 VertexAI Instant Preview:\x1b[0m Your React UI renders live in the \x1b[1;32m👁️ Preview\x1b[0m tab above!\r\n\x1b[90m(You don't need to run 'npm install' or dev servers to see your app live)\x1b[0m\r\n\r\n")
 
             ptyProcess.onData((data) => {
                 send(socket, data)
