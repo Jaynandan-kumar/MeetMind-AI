@@ -40,11 +40,15 @@ export const login = async (req, res) => {
         res.cookie("session", sessionId, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
             maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
-        return res.status(200).json(user);
+        const userData = user.toObject ? user.toObject() : user;
+        return res.status(200).json({
+            ...userData,
+            sessionId
+        });
     } catch (error) {
         console.error("LOGIN ERROR IN AUTH SERVICE:", error);
         return res.status(500).json({ message: `login error ${error}` });

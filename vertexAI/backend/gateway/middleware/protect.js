@@ -3,6 +3,15 @@ import redis from "../../shared/redis/redis.js";
 export const protect = async (req, res, next) => {
     try {
         let sessionId = req.cookies?.session;
+        if (!sessionId && req.headers?.authorization) {
+            const authHeader = req.headers.authorization;
+            if (authHeader.startsWith("Bearer ")) {
+                sessionId = authHeader.slice(7).trim();
+            }
+        }
+        if (!sessionId && req.headers?.["x-session-id"]) {
+            sessionId = req.headers["x-session-id"];
+        }
         if (!sessionId && req.headers?.cookie) {
             const cookies = req.headers.cookie.split(";");
             for (let c of cookies) {
