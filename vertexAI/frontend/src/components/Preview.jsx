@@ -68,26 +68,61 @@ function Preview({ tree }) {
         const isReact = jsxFileNames.length > 0 || Object.keys(filesMap).some(k => k === "package.json" && (filesMap[k].includes("react") || filesMap[k].includes("vite")))
 
         if (isReact) {
-            // Find main React code (App.jsx, App.js, main.jsx, or first jsx file)
-            const appKey = jsxFileNames.find(k => k.endsWith("App.jsx") || k.endsWith("App.tsx")) || jsxFileNames[0] || ""
-            const appCode = filesMap[appKey] || filesMap["src/App.jsx"] || filesMap["App.jsx"] || ""
+            // Collect all JS/JSX files
+            const jsFiles = Object.keys(filesMap).filter(k =>
+                (k.endsWith(".jsx") || k.endsWith(".tsx") || k.endsWith(".js") || k.endsWith(".ts")) &&
+                !k.endsWith("vite.config.js") &&
+                !k.endsWith("tailwind.config.js")
+            )
 
-            // Clean imports from appCode so it runs standalone with global React / Lucide
-            const cleanedCode = (appCode || "")
-                .replace(/import\s+React\s*,\s*\{([^}]+)\}\s+from\s+['"][^'"]+['"];?/g, 'const { $1 } = React;')
-                .replace(/import\s+React\s+from\s+['"][^'"]+['"];?/g, '')
-                .replace(/import\s+\{([^}]+)\}\s+from\s+['"]react['"];?/g, 'const { $1 } = React;')
-                .replace(/import\s+\{([^}]+)\}\s+from\s+['"]lucide-react['"];?/g, (match, icons) => {
-                    const iconList = icons.split(',').map(i => i.trim()).filter(Boolean);
-                    return iconList.map(i => `const ${i} = (props) => React.createElement('span', { className: 'inline-flex items-center text-xs opacity-75', ...props }, '[${i}]');`).join('\n');
-                })
-                .replace(/import\s+.*from\s+['"][^'"]+['"];?/g, '')
-                .replace(/export\s+default\s+function\s+([A-Za-z0-9_]+)/g, 'function $1')
-                .replace(/export\s+default\s+([A-Za-z0-9_]+);?/g, '')
+            // Find entry component file (App.jsx, App.tsx, or first jsx file)
+            const entryKeys = jsFiles.filter(k =>
+                k.endsWith("App.jsx") || k.endsWith("App.tsx") || k.endsWith("App.js")
+            )
+            const mainKey = entryKeys[0] || jsFiles.find(k => k.endsWith(".jsx")) || jsFiles[0] || ""
+
+            // Sub-components to concatenate before App
+            const subFiles = jsFiles.filter(k => k !== mainKey && !k.endsWith("main.jsx") && !k.endsWith("index.jsx"))
+            subFiles.sort((a, b) => {
+                const aIsComp = a.includes("component")
+                const bIsComp = b.includes("component")
+                if (!aIsComp && bIsComp) return -1
+                if (aIsComp && !bIsComp) return 1
+                return a.localeCompare(b)
+            })
+
+            const cleanCode = (code, filePath) => {
+                if (!code) return ""
+                const baseName = filePath.replace(/\.[^/.]+$/, "").split("/").pop() || "Component"
+
+                return code
+                    .replace(/import\s+React\s*,\s*\{([^}]+)\}\s+from\s+['"][^'"]+['"];?/g, 'const { $1 } = React;')
+                    .replace(/import\s+React\s+from\s+['"][^'"]+['"];?/g, '')
+                    .replace(/import\s+\{([^}]+)\}\s+from\s+['"]react['"];?/g, 'const { $1 } = React;')
+                    .replace(/import\s+\{[^}]+\}\s+from\s+['"]lucide-react['"];?/g, '')
+                    .replace(/import\s+['"][^'"]+\.(?:css|scss|less)['"];?/g, '')
+                    .replace(/import\s+.*from\s+['"][^'"]+['"];?/g, '')
+                    .replace(/import\s+['"][^'"]+['"];?/g, '')
+                    .replace(/export\s+default\s+function\s+([A-Za-z0-9_]+)/g, 'function $1')
+                    .replace(/export\s+default\s+function\s*\(/g, `function ${baseName}(`)
+                    .replace(/export\s+default\s+class\s+([A-Za-z0-9_]+)/g, 'class $1')
+                    .replace(/export\s+default\s+([A-Za-z0-9_]+);?/g, '')
+                    .replace(/export\s+(const|let|var|function|class)\s+/g, '$1 ')
+                    .replace(/export\s*\{[^}]*\};?/g, '')
+            }
+
+            const subCodeBundled = subFiles.map(path => {
+                const raw = filesMap[path] || ""
+                return `\n/* File: ${path} */\n${cleanCode(raw, path)}\n`
+            }).join("\n")
+
+            const mainRaw = filesMap[mainKey] || filesMap["src/App.jsx"] || filesMap["App.jsx"] || ""
+            const mainCodeCleaned = cleanCode(mainRaw, mainKey || "App")
 
             // Detect main component name
-            const compMatch = appCode.match(/export\s+default\s+(?:function\s+)?([A-Za-z0-9_]+)/)
-            const rootCompName = compMatch ? compMatch[1] : (appCode.match(/function\s+([A-Z][A-Za-z0-9_]+)/)?.[1] || "App")
+            const compMatch = mainRaw.match(/export\s+default\s+(?:function\s+)?([A-Za-z0-9_]+)/)
+            let rootCompName = compMatch ? compMatch[1] : (mainRaw.match(/function\s+([A-Z][A-Za-z0-9_]+)/)?.[1] || "App")
+            if (rootCompName === "default" || !rootCompName) rootCompName = "App"
 
             return `
                 <!DOCTYPE html>
@@ -99,22 +134,119 @@ function Preview({ tree }) {
                     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
                     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
                     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+                    <script src="https://unpkg.com/lucide@latest"></script>
                     <style>
-                        body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; }
+                        body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #09090b; color: #f4f4f5; }
                         ${css}
                     </style>
                 </head>
                 <body>
                     <div id="root"></div>
                     <script type="text/babel">
-                        try {
-                            ${cleanedCode}
+                        window.onerror = function(msg, url, line) {
+                            const root = document.getElementById('root');
+                            if (root) {
+                                root.innerHTML = '<div style="margin:24px;padding:20px;background:#18181b;border:1px solid #ef4444;border-radius:12px;color:#fca5a5;font-family:sans-serif;"><h3 style="margin:0 0 8px;color:#ef4444;font-size:15px;font-weight:600;">⚠️ Preview Transpilation Error</h3><p style="margin:0;font-size:13px;font-family:monospace;background:#09090b;padding:12px;border-radius:8px;">' + msg + '</p></div>';
+                            }
+                        };
 
+                        const { useState, useEffect, useMemo, useRef, useCallback, useContext, createContext } = React;
+
+                        // Dynamic Lucide Proxy
+                        const LucideProxy = new Proxy({}, {
+                            get: (target, prop) => {
+                                if (typeof prop !== 'string' || prop === 'then') return undefined;
+                                return function DynamicIcon(props) {
+                                    const size = props.size || 18;
+                                    const strokeWidth = props.strokeWidth || 2;
+                                    const color = props.color || 'currentColor';
+                                    const className = props.className || '';
+
+                                    if (window.lucide && window.lucide.icons && window.lucide.icons[prop]) {
+                                        const iconDef = window.lucide.icons[prop];
+                                        const svgNode = window.lucide.createElement(iconDef, {
+                                            width: size,
+                                            height: size,
+                                            stroke: color,
+                                            'stroke-width': strokeWidth,
+                                            class: className
+                                        });
+                                        return React.createElement('span', {
+                                            className: 'inline-flex items-center justify-center align-middle',
+                                            dangerouslySetInnerHTML: { __html: svgNode.outerHTML }
+                                        });
+                                    }
+
+                                    return (
+                                        <svg
+                                            width={size}
+                                            height={size}
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke={color}
+                                            strokeWidth={strokeWidth}
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            className={'inline-block align-middle ' + className}
+                                        >
+                                            <circle cx="12" cy="12" r="9" />
+                                            <path d="M12 8v4l3 3" />
+                                        </svg>
+                                    );
+                                };
+                            }
+                        });
+
+                        const {
+                            Car, Star, Shield, MapPin, Fuel, Calendar, Clock, Users, Check,
+                            ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Bell,
+                            User, Heart, Sparkles, Zap, Award, Info, AlertCircle, ArrowRight,
+                            ArrowLeft, Plus, Minus, Trash, Edit, Eye, EyeOff, Filter, RefreshCw
+                        } = LucideProxy;
+
+                        class ErrorBoundary extends React.Component {
+                            constructor(props) {
+                                super(props);
+                                this.state = { hasError: false, error: null };
+                            }
+                            static getDerivedStateFromError(error) {
+                                return { hasError: true, error };
+                            }
+                            componentDidCatch(error, info) {
+                                console.error("Preview render error:", error, info);
+                            }
+                            render() {
+                                if (this.state.hasError) {
+                                    return (
+                                        <div style={{ margin: '24px', padding: '20px', background: '#18181b', border: '1px solid #ef4444', borderRadius: '12px', color: '#fca5a5', fontFamily: 'sans-serif' }}>
+                                            <h3 style={{ margin: '0 0 8px', color: '#ef4444', fontSize: '15px', fontWeight: '600' }}>⚠️ Component Render Error</h3>
+                                            <p style={{ margin: '0 0 12px', fontSize: '13px', fontFamily: 'monospace', background: '#09090b', padding: '12px', borderRadius: '8px' }}>{this.state.error?.message || String(this.state.error)}</p>
+                                            <button onClick={() => window.location.reload()} style={{ padding: '6px 12px', background: '#ef4444', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '12px' }}>
+                                                Reload Preview
+                                            </button>
+                                        </div>
+                                    );
+                                }
+                                return this.props.children;
+                            }
+                        }
+
+                        // Sub-components
+                        ${subCodeBundled}
+
+                        // Main Component
+                        ${mainCodeCleaned}
+
+                        try {
                             const rootEl = document.getElementById('root');
                             if (typeof ${rootCompName} !== 'undefined') {
-                                ReactDOM.createRoot(rootEl).render(React.createElement(${rootCompName}));
+                                ReactDOM.createRoot(rootEl).render(
+                                    <ErrorBoundary>
+                                        <${rootCompName} />
+                                    </ErrorBoundary>
+                                );
                             } else {
-                                rootEl.innerHTML = '<div style="padding:40px;text-align:center;color:#94a3b8;">Component loaded.</div>';
+                                rootEl.innerHTML = '<div style="padding:40px;text-align:center;color:#94a3b8;">No export found in main component.</div>';
                             }
                         } catch (err) {
                             document.getElementById('root').innerHTML = '<div style="padding:24px;color:#ef4444;font-family:monospace;background:#1e1e24;border-radius:8px;margin:20px;"><b>Preview Error:</b><br/>' + err.message + '</div>';

@@ -53,9 +53,11 @@ function Terminal({ projectId, userId }) {
             withCredentials: true
         })
 
+        let hasShownError = false
+
         socket.on("connect", () => {
             setConnected(true)
-            console.log("socket connected")
+            hasShownError = false
             fitTerminal()
             socket.emit("terminal:init", {
                 projectId,
@@ -100,11 +102,12 @@ function Terminal({ projectId, userId }) {
         const containerEl = containerRef.current
         containerEl?.addEventListener("click", focusTerminal)
 
-        socket.on("connect_error", (error) => {
+        socket.on("connect_error", () => {
             setConnected(false)
-            terminal.write(
-                `\r\n\x1b[31m${error.message}\x1b[0m\r\n`
-            )
+            if (!hasShownError) {
+                terminal.write("\r\n\x1b[33m[Connecting to cloud terminal...]\x1b[0m\r\n")
+                hasShownError = true
+            }
         })
 
         socket.on("disconnect", () => {
@@ -136,22 +139,24 @@ function Terminal({ projectId, userId }) {
                     <span className={`h-1.5 w-1.5 rounded-full ${
                         connected
                             ? "bg-emerald-400"
-                            : "bg-zinc-600"
+                            : "bg-amber-400 animate-pulse"
                     }`}
                     />
-                    <span className="text-[11px] text-zinc-500">
+                    <span className="text-[11px] text-zinc-400">
                         {connected
                             ? "terminal - connected"
-                            : "terminal - disconnected"}
+                            : "terminal - connecting..."}
                     </span>
                 </div>
-                <button
-                    onClick={clearTerminal}
-                    title="Clear terminal"
-                    className="rounded p-1 text-zinc-500 transition-colors hover:bg-white/10 hover:text-white cursor-pointer"
-                >
-                    <Eraser size={12} />
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={clearTerminal}
+                        title="Clear terminal"
+                        className="rounded p-1 text-zinc-500 transition-colors hover:bg-white/10 hover:text-white cursor-pointer"
+                    >
+                        <Eraser size={12} />
+                    </button>
+                </div>
             </div>
             <div ref={containerRef} className='min-h-0 flex-1 cursor-text overflow-hidden' />
         </div>
