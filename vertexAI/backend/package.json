@@ -8,6 +8,7 @@
     "postinstall": "npm --prefix gateway install && npm --prefix services/auth install && npm --prefix services/project install && npm --prefix services/file install && npm --prefix services/ai install && npm --prefix services/payment install"
   },
   "dependencies": {
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "ioredis": "^6.0.0"
   }
 }
