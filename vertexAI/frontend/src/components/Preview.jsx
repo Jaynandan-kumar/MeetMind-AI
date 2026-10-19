@@ -127,13 +127,8 @@ function Preview({ tree }) {
                 const baseName = filePath.replace(/\.[^/.]+$/, "").split("/").pop() || "Component"
 
                 return code
-                    .replace(/import\s+React\s*,\s*\{[^}]*\}\s+from\s+['"][^'"]+['"];?/g, '')
-                    .replace(/import\s+React\s+from\s+['"][^'"]+['"];?/g, '')
-                    .replace(/import\s+\{[^}]*\}\s+from\s+['"]react['"];?/g, '')
-                    .replace(/import\s+\{[^}]*\}\s+from\s+['"]lucide-react['"];?/g, '')
-                    .replace(/import\s+['"][^'"]+\.(?:css|scss|less)['"];?/g, '')
-                    .replace(/import\s+.*from\s+['"][^'"]+['"];?/g, '')
-                    .replace(/import\s+['"][^'"]+['"];?/g, '')
+                    .replace(/import\s*[\s\S]*?from\s*['"][^'"]+['"];?/g, '')
+                    .replace(/import\s*['"][^'"]+['"];?/g, '')
                     .replace(/export\s+default\s+function\s+([A-Za-z0-9_]+)/g, 'function $1')
                     .replace(/export\s+default\s+function\s*\(/g, `function ${baseName}(`)
                     .replace(/export\s+default\s+class\s+([A-Za-z0-9_]+)/g, 'class $1')
@@ -290,12 +285,16 @@ ${rawBundleCode}
                             try {
                                 var source = document.getElementById('preview-bundle-source').textContent;
                                 var compiled = Babel.transform(source, {
-                                    presets: ['react'],
+                                    presets: ['react', 'env'],
                                     filename: 'preview-bundle.jsx'
                                 }).code;
 
-                                var runner = new Function(compiled);
-                                runner();
+                                var runner = new Function('React', 'ReactDOM', 'LucideProxy', 'require', compiled);
+                                runner(React, ReactDOM, LucideProxy, function(mod) {
+                                    if (mod === 'react') return React;
+                                    if (mod && String(mod).indexOf('lucide') !== -1) return LucideProxy;
+                                    return {};
+                                });
                             } catch (err) {
                                 console.error("Preview Bundle Error:", err);
                                 if (rootEl) {
