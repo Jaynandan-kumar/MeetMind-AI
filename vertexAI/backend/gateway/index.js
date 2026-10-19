@@ -37,6 +37,7 @@ app.use(morgan("dev"));
 const terminalService = process.env.TERMINAL_SERVICE || "http://localhost:8005";
 
 app.use("/socket.io", proxy(terminalService));
+app.use("/sync-project", proxy(terminalService));
 
 app.use("/api/auth", proxy(process.env.AUTH_SERVICE));
 app.use("/api/project", protect, proxyWithHeader(process.env.PROJECT_SERVICE));

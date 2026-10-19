@@ -114,10 +114,15 @@ const syncProject = async (projectId, userId) => {
     const root = workspace(projectId)
     await fs.mkdir(root, { recursive: true })
 
-    if (tree.length == 1 && tree[0]?.type == "folder") {
-        await writeNodes(tree[0].children || [], root)
+    const rootFolder = Array.isArray(tree) ? tree.find(node => node.type === "folder" && Array.isArray(node.children) && node.children.length > 0) : null;
+    if (rootFolder) {
+        await writeNodes(rootFolder.children || [], root);
+        const siblings = tree.filter(n => n !== rootFolder);
+        if (siblings.length > 0) {
+            await writeNodes(siblings, root);
+        }
     } else {
-        await writeNodes(tree, root)
+        await writeNodes(tree, root);
     }
 
     return {

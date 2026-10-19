@@ -180,14 +180,20 @@ export const getTree = async (req, res) => {
     try {
         const userId = req.headers["x-user-id"];
         const { projectId } = req.params;
-        const files = await File.find({
-            projectId,
-            owner: userId,
-            isDeleted: false
-        }).sort({
+        const query = { projectId, isDeleted: false };
+        if (userId) {
+            query.owner = userId;
+        }
+        let files = await File.find(query).sort({
             name: 1,
             type: -1
         });
+        if (files.length === 0) {
+            files = await File.find({ projectId, isDeleted: false }).sort({
+                name: 1,
+                type: -1
+            });
+        }
 
         const tree = await buildTree(files);
         return res.status(200).json(tree);
