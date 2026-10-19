@@ -22,22 +22,37 @@ cleanupExpiredSessions();
 setInterval(cleanupExpiredSessions, 15 * 60 * 1000);
 
 const defaultOrigins = ["http://localhost:5173", "http://localhost:3000", "http://localhost:5174", "http://localhost:5175"];
-const allowedOrigins = process.env.ORIGINS
+const envOrigins = process.env.ORIGINS
   ? process.env.ORIGINS.split(",").map(o => o.trim()).filter(Boolean)
-  : defaultOrigins;
-app.use(cors({origin: allowedOrigins, credentials: true}))
-app.use(cookieParser())
+  : [];
+const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins])];
 
-app.use("/api/clerk", express.raw({type: "application/json"}), handleClerkWebhook)
-app.use(express.json())
-app.use(clerkMiddleware())
+const corsOriginValidator = (origin, callback) => {
+  if (!origin) return callback(null, true);
+  if (
+    origin.endsWith(".vercel.app") ||
+    origin.startsWith("http://localhost:") ||
+    origin.startsWith("http://127.0.0.1:") ||
+    allowedOrigins.includes(origin)
+  ) {
+    return callback(null, true);
+  }
+  return callback(null, false);
+};
 
-app.get("/", (req, res)=> res.send("API is Live!"))
-app.use("/api/meetings", meetingRouter)
+app.use(cors({ origin: corsOriginValidator, credentials: true }));
+app.use(cookieParser());
+
+app.use("/api/clerk", express.raw({type: "application/json"}), handleClerkWebhook);
+app.use(express.json());
+app.use(clerkMiddleware());
+
+app.get("/", (req, res)=> res.send("API is Live!"));
+app.use("/api/meetings", meetingRouter);
 
 const io = new Server(server, {
-  cors: {origin: allowedOrigins, credentials: true}
-})
+  cors: { origin: corsOriginValidator, credentials: true }
+});
 
 setupSocketIO(io)
 
