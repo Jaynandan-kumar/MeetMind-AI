@@ -33,8 +33,8 @@ function Preview({ tree }) {
         setUserModeOverride(null)
     }, [tree])
 
-    // Default to Localhost Dev Server for Vite/React projects (as user expects)
-    const effectiveMode = userModeOverride || (isReactOrServerProject ? "server" : "static")
+    // Default to Live Preview so user sees immediate UI, with Localhost switch available
+    const effectiveMode = userModeOverride || "static"
 
     const handleReload = () => {
         setIframeKey(k => k + 1)
@@ -361,16 +361,6 @@ ${rawBundleCode}
                     <div className='flex items-center gap-1 rounded-md bg-white/[0.06] p-0.5 text-[11px]'>
                         <button
                             type="button"
-                            onClick={() => setUserModeOverride("server")}
-                            className={`flex items-center gap-1.5 rounded px-2.5 py-1 font-medium transition-colors cursor-pointer ${
-                                effectiveMode === "server" ? "bg-zinc-800 text-sky-400 shadow-sm" : "text-zinc-400 hover:text-zinc-200"
-                            }`}
-                        >
-                            <Globe size={12} />
-                            <span>Localhost (Dev Server)</span>
-                        </button>
-                        <button
-                            type="button"
                             onClick={() => setUserModeOverride("static")}
                             className={`flex items-center gap-1.5 rounded px-2.5 py-1 font-medium transition-colors cursor-pointer ${
                                 effectiveMode === "static" ? "bg-zinc-800 text-emerald-400 shadow-sm" : "text-zinc-400 hover:text-zinc-200"
@@ -378,6 +368,16 @@ ${rawBundleCode}
                         >
                             <Sparkles size={12} />
                             <span>Live Preview</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setUserModeOverride("server")}
+                            className={`flex items-center gap-1.5 rounded px-2.5 py-1 font-medium transition-colors cursor-pointer ${
+                                effectiveMode === "server" ? "bg-zinc-800 text-sky-400 shadow-sm" : "text-zinc-400 hover:text-zinc-200"
+                            }`}
+                        >
+                            <Globe size={12} />
+                            <span>Localhost (Dev Server)</span>
                         </button>
                     </div>
                 </div>

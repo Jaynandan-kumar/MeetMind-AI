@@ -125,6 +125,12 @@ const syncProject = async (projectId, userId) => {
         await writeNodes(tree, root);
     }
 
+    try {
+        const sharedModules = path.resolve(process.cwd(), "node_modules");
+        const targetModules = path.join(root, "node_modules");
+        await fs.symlink(sharedModules, targetModules, "junction").catch(() => {});
+    } catch (e) {}
+
     return {
         tree,
         root
