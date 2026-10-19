@@ -2,35 +2,10 @@ import React, { useMemo, useState, useEffect } from 'react'
 import { RotateCw, Globe, Code } from 'lucide-react'
 
 function Preview({ tree }) {
-    // Detect whether project has React / Vite / package.json dependencies
-    const isReactOrServerProject = useMemo(() => {
-        let hasServerOrFramework = false
-        const check = (items = []) => {
-            for (const item of items) {
-                const name = (item.name || "").toLowerCase()
-                if (
-                    name === "package.json" ||
-                    name === "vite.config.js" ||
-                    name === "vite.config.ts" ||
-                    name.endsWith(".jsx") ||
-                    name.endsWith(".tsx")
-                ) {
-                    hasServerOrFramework = true
-                    return
-                }
-                if (item.children?.length) check(item.children)
-            }
-        }
-        check(tree)
-        return hasServerOrFramework
-    }, [tree])
-
-    // State for preview mode ("static" by default for instant zero-dependency in-browser render, or "server" for custom localhost)
     const [userModeOverride, setUserModeOverride] = useState(null)
     const [serverUrl, setServerUrl] = useState("http://localhost:5175")
     const [iframeKey, setIframeKey] = useState(0)
 
-    // Reset override when tree/project changes
     useEffect(() => {
         setUserModeOverride(null)
     }, [tree])
@@ -42,17 +17,35 @@ function Preview({ tree }) {
     }
 
     const srcDoc = useMemo(() => {
+        if (!tree || tree.length === 0) {
+            return `
+                <!DOCTYPE html>
+                <html>
+                <body style="margin:0;background:#09090b;color:#a1a1aa;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">
+                    <div style="text-align:center;">
+                        <div style="width:32px;height:32px;border:2px solid #38bdf8;border-top-color:transparent;border-radius:50%;margin:0 auto 12px;animation:spin 1s linear infinite;"></div>
+                        <p style="margin:0;font-size:13px;">Loading project files...</p>
+                        <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+                    </div>
+                </body>
+                </html>
+            `
+        }
+
         let html = ""
         let css = ""
         let js = ""
-        const filesMap = {}
+        const filesByPath = {}
 
         const walk = (items = [], currentPath = "") => {
             for (const item of items) {
                 const itemPath = currentPath ? `${currentPath}/${item.name}` : item.name
                 if (item.type === "file") {
-                    filesMap[item.name] = item.content || ""
-                    filesMap[itemPath] = item.content || ""
+                    filesByPath[itemPath] = {
+                        name: item.name,
+                        path: itemPath,
+                        content: item.content || ""
+                    }
                     if (item.name === "index.html") html = item.content || ""
                     if (item.name.endsWith(".css")) css += "\n" + (item.content || "")
                     if (item.name.endsWith(".js") && !item.name.endsWith(".jsx")) js += "\n" + (item.content || "")
@@ -63,32 +56,46 @@ function Preview({ tree }) {
 
         walk(tree)
 
-        // Check if project has React JSX files
-        const jsxFileNames = Object.keys(filesMap).filter(k => k.endsWith(".jsx") || k.endsWith(".tsx"))
-        const isReact = jsxFileNames.length > 0 || Object.keys(filesMap).some(k => k === "package.json" && (filesMap[k].includes("react") || filesMap[k].includes("vite")))
+        const allFiles = Object.values(filesByPath)
+        const jsxFiles = allFiles.filter(f => f.name.endsWith(".jsx") || f.name.endsWith(".tsx"))
+        const isReact = jsxFiles.length > 0 || allFiles.some(f => f.name === "package.json" && (f.content.includes("react") || f.content.includes("vite")))
 
         if (isReact) {
-            // Collect all JS/JSX files
-            const jsFiles = Object.keys(filesMap).filter(k =>
-                (k.endsWith(".jsx") || k.endsWith(".tsx") || k.endsWith(".js") || k.endsWith(".ts")) &&
-                !k.endsWith("vite.config.js") &&
-                !k.endsWith("tailwind.config.js")
+            // Find main entry component (e.g. App.jsx, App.tsx, or first .jsx file)
+            const mainFile = jsxFiles.find(f => f.name.startsWith("App.") || f.name === "App.jsx" || f.name === "App.tsx")
+                || jsxFiles.find(f => f.name !== "main.jsx" && f.name !== "index.jsx" && f.name !== "main.tsx" && f.name !== "index.tsx")
+                || jsxFiles[0]
+
+            const mainPath = mainFile?.path
+
+            // Sub-components: all other .jsx, .tsx, .js files
+            const subFiles = allFiles.filter(f =>
+                f.path !== mainPath &&
+                (f.name.endsWith(".jsx") || f.name.endsWith(".tsx") || f.name.endsWith(".js")) &&
+                !f.name.endsWith(".config.js") &&
+                !f.name.endsWith(".config.ts") &&
+                f.name !== "main.jsx" &&
+                f.name !== "index.jsx" &&
+                f.name !== "main.tsx" &&
+                f.name !== "index.tsx"
             )
 
-            // Find entry component file (App.jsx, App.tsx, or first jsx file)
-            const entryKeys = jsFiles.filter(k =>
-                k.endsWith("App.jsx") || k.endsWith("App.tsx") || k.endsWith("App.js")
-            )
-            const mainKey = entryKeys[0] || jsFiles.find(k => k.endsWith(".jsx")) || jsFiles[0] || ""
+            // Deduplicate subfiles by filename to ensure no duplicate components
+            const uniqueSubFiles = []
+            const seenNames = new Set()
+            for (const f of subFiles) {
+                if (!seenNames.has(f.name)) {
+                    seenNames.add(f.name)
+                    uniqueSubFiles.push(f)
+                }
+            }
 
-            // Sub-components to concatenate before App
-            const subFiles = jsFiles.filter(k => k !== mainKey && !k.endsWith("main.jsx") && !k.endsWith("index.jsx"))
-            subFiles.sort((a, b) => {
-                const aIsComp = a.includes("component")
-                const bIsComp = b.includes("component")
+            uniqueSubFiles.sort((a, b) => {
+                const aIsComp = a.path.includes("component")
+                const bIsComp = b.path.includes("component")
                 if (!aIsComp && bIsComp) return -1
                 if (aIsComp && !bIsComp) return 1
-                return a.localeCompare(b)
+                return a.name.localeCompare(b.name)
             })
 
             const cleanCode = (code, filePath) => {
@@ -96,10 +103,10 @@ function Preview({ tree }) {
                 const baseName = filePath.replace(/\.[^/.]+$/, "").split("/").pop() || "Component"
 
                 return code
-                    .replace(/import\s+React\s*,\s*\{([^}]+)\}\s+from\s+['"][^'"]+['"];?/g, 'const { $1 } = React;')
+                    .replace(/import\s+React\s*,\s*\{[^}]*\}\s+from\s+['"][^'"]+['"];?/g, '')
                     .replace(/import\s+React\s+from\s+['"][^'"]+['"];?/g, '')
-                    .replace(/import\s+\{([^}]+)\}\s+from\s+['"]react['"];?/g, 'const { $1 } = React;')
-                    .replace(/import\s+\{[^}]+\}\s+from\s+['"]lucide-react['"];?/g, '')
+                    .replace(/import\s+\{[^}]*\}\s+from\s+['"]react['"];?/g, '')
+                    .replace(/import\s+\{[^}]*\}\s+from\s+['"]lucide-react['"];?/g, '')
                     .replace(/import\s+['"][^'"]+\.(?:css|scss|less)['"];?/g, '')
                     .replace(/import\s+.*from\s+['"][^'"]+['"];?/g, '')
                     .replace(/import\s+['"][^'"]+['"];?/g, '')
@@ -111,18 +118,113 @@ function Preview({ tree }) {
                     .replace(/export\s*\{[^}]*\};?/g, '')
             }
 
-            const subCodeBundled = subFiles.map(path => {
-                const raw = filesMap[path] || ""
-                return `\n/* File: ${path} */\n${cleanCode(raw, path)}\n`
+            const subCodeBundled = uniqueSubFiles.map(file => {
+                return `\n/* File: ${file.path} */\n${cleanCode(file.content, file.path)}\n`
             }).join("\n")
 
-            const mainRaw = filesMap[mainKey] || filesMap["src/App.jsx"] || filesMap["App.jsx"] || ""
-            const mainCodeCleaned = cleanCode(mainRaw, mainKey || "App")
+            const mainRaw = mainFile?.content || ""
+            const mainCodeCleaned = cleanCode(mainRaw, mainFile?.path || "App")
 
             // Detect main component name
             const compMatch = mainRaw.match(/export\s+default\s+(?:function\s+)?([A-Za-z0-9_]+)/)
             let rootCompName = compMatch ? compMatch[1] : (mainRaw.match(/function\s+([A-Z][A-Za-z0-9_]+)/)?.[1] || "App")
             if (rootCompName === "default" || !rootCompName) rootCompName = "App"
+
+            const rawBundleCode = `
+                const { useState, useEffect, useMemo, useRef, useCallback, useContext, createContext } = React;
+
+                // Universal Lucide SVG Proxy
+                const LucideProxy = new Proxy({}, {
+                    get: (target, prop) => {
+                        if (typeof prop !== 'string' || prop === 'then' || prop === 'prototype') return undefined;
+                        return function DynamicLucideIcon(props) {
+                            const p = props || {};
+                            const size = p.size || 18;
+                            const strokeWidth = p.strokeWidth || 2;
+                            const color = p.color || 'currentColor';
+                            const className = p.className || '';
+
+                            if (window.lucide && window.lucide.icons && window.lucide.icons[prop]) {
+                                const iconDef = window.lucide.icons[prop];
+                                const svgNode = window.lucide.createElement(iconDef, {
+                                    width: size,
+                                    height: size,
+                                    stroke: color,
+                                    'stroke-width': strokeWidth,
+                                    class: className
+                                });
+                                return React.createElement('span', {
+                                    className: 'inline-flex items-center justify-center align-middle',
+                                    dangerouslySetInnerHTML: { __html: svgNode.outerHTML }
+                                });
+                            }
+
+                            return React.createElement('svg', {
+                                width: size,
+                                height: size,
+                                viewBox: '0 0 24 24',
+                                fill: 'none',
+                                stroke: color,
+                                strokeWidth: strokeWidth,
+                                strokeLinecap: 'round',
+                                strokeLinejoin: 'round',
+                                className: 'inline-block align-middle ' + className
+                            }, React.createElement('circle', { cx: 12, cy: 12, r: 8 }), React.createElement('path', { d: 'M12 8v4l2 2' }));
+                        };
+                    }
+                });
+
+                const {
+                    Car, Star, Shield, MapPin, Fuel, Calendar, Clock, Users, Check,
+                    ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Bell,
+                    User, Heart, Sparkles, Zap, Award, Info, AlertCircle, ArrowRight,
+                    ArrowLeft, Plus, Minus, Trash, Edit, Eye, EyeOff, Filter, RefreshCw
+                } = LucideProxy;
+
+                class ErrorBoundary extends React.Component {
+                    constructor(props) {
+                        super(props);
+                        this.state = { hasError: false, error: null };
+                    }
+                    static getDerivedStateFromError(error) {
+                        return { hasError: true, error };
+                    }
+                    componentDidCatch(error, info) {
+                        console.error("Preview render error:", error, info);
+                    }
+                    render() {
+                        if (this.state.hasError) {
+                            return (
+                                <div style={{ margin: '24px', padding: '20px', background: '#18181b', border: '1px solid #ef4444', borderRadius: '12px', color: '#fca5a5', fontFamily: 'sans-serif' }}>
+                                    <h3 style={{ margin: '0 0 8px', color: '#ef4444', fontSize: '15px', fontWeight: '600' }}>⚠️ Component Render Error</h3>
+                                    <p style={{ margin: '0 0 12px', fontSize: '13px', fontFamily: 'monospace', background: '#09090b', padding: '12px', borderRadius: '8px' }}>{this.state.error?.message || String(this.state.error)}</p>
+                                    <button onClick={() => window.location.reload()} style={{ padding: '6px 12px', background: '#ef4444', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '12px' }}>
+                                        Reload Preview
+                                    </button>
+                                </div>
+                            );
+                        }
+                        return this.props.children;
+                    }
+                }
+
+                // Sub-components
+                ${subCodeBundled}
+
+                // Main Component
+                ${mainCodeCleaned}
+
+                const rootEl = document.getElementById('root');
+                if (typeof ${rootCompName} !== 'undefined') {
+                    ReactDOM.createRoot(rootEl).render(
+                        <ErrorBoundary>
+                            <${rootCompName} />
+                        </ErrorBoundary>
+                    );
+                } else {
+                    rootEl.innerHTML = '<div style="padding:40px;text-align:center;color:#94a3b8;">No root component found. Ensure App.jsx exports a component.</div>';
+                }
+            `
 
             return `
                 <!DOCTYPE html>
@@ -139,118 +241,51 @@ function Preview({ tree }) {
                         body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #09090b; color: #f4f4f5; }
                         ${css}
                     </style>
+                    <script>
+                        window.onerror = function(msg, url, line, col, err) {
+                            var root = document.getElementById('root');
+                            if (root && (!root.innerHTML || root.innerHTML.trim() === '')) {
+                                root.innerHTML = '<div style="margin:20px;padding:20px;background:#18181b;border:1px solid #ef4444;border-radius:10px;color:#fca5a5;font-family:sans-serif;">' +
+                                    '<h3 style="margin:0 0 8px;color:#ef4444;font-size:15px;font-weight:600;">⚠️ Script Execution Error</h3>' +
+                                    '<p style="margin:0;font-size:13px;font-family:monospace;background:#09090b;padding:12px;border-radius:6px;white-space:pre-wrap;">' + (err ? err.message : msg) + '</p>' +
+                                '</div>';
+                            }
+                        };
+                    </script>
                 </head>
                 <body>
                     <div id="root"></div>
-                    <script type="text/babel">
-                        window.onerror = function(msg, url, line) {
-                            const root = document.getElementById('root');
-                            if (root) {
-                                root.innerHTML = '<div style="margin:24px;padding:20px;background:#18181b;border:1px solid #ef4444;border-radius:12px;color:#fca5a5;font-family:sans-serif;"><h3 style="margin:0 0 8px;color:#ef4444;font-size:15px;font-weight:600;">⚠️ Preview Transpilation Error</h3><p style="margin:0;font-size:13px;font-family:monospace;background:#09090b;padding:12px;border-radius:8px;">' + msg + '</p></div>';
-                            }
-                        };
 
-                        const { useState, useEffect, useMemo, useRef, useCallback, useContext, createContext } = React;
+                    <script id="preview-bundle-source" type="text/plain">
+${rawBundleCode}
+                    </script>
 
-                        // Dynamic Lucide Proxy
-                        const LucideProxy = new Proxy({}, {
-                            get: (target, prop) => {
-                                if (typeof prop !== 'string' || prop === 'then') return undefined;
-                                return function DynamicIcon(props) {
-                                    const size = props.size || 18;
-                                    const strokeWidth = props.strokeWidth || 2;
-                                    const color = props.color || 'currentColor';
-                                    const className = props.className || '';
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var rootEl = document.getElementById('root');
+                            try {
+                                var source = document.getElementById('preview-bundle-source').textContent;
+                                var compiled = Babel.transform(source, {
+                                    presets: ['react'],
+                                    filename: 'preview-bundle.jsx'
+                                }).code;
 
-                                    if (window.lucide && window.lucide.icons && window.lucide.icons[prop]) {
-                                        const iconDef = window.lucide.icons[prop];
-                                        const svgNode = window.lucide.createElement(iconDef, {
-                                            width: size,
-                                            height: size,
-                                            stroke: color,
-                                            'stroke-width': strokeWidth,
-                                            class: className
-                                        });
-                                        return React.createElement('span', {
-                                            className: 'inline-flex items-center justify-center align-middle',
-                                            dangerouslySetInnerHTML: { __html: svgNode.outerHTML }
-                                        });
-                                    }
-
-                                    return (
-                                        <svg
-                                            width={size}
-                                            height={size}
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke={color}
-                                            strokeWidth={strokeWidth}
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            className={'inline-block align-middle ' + className}
-                                        >
-                                            <circle cx="12" cy="12" r="9" />
-                                            <path d="M12 8v4l3 3" />
-                                        </svg>
-                                    );
-                                };
+                                var runner = new Function(compiled);
+                                runner();
+                            } catch (err) {
+                                console.error("Preview Bundle Error:", err);
+                                if (rootEl) {
+                                    rootEl.innerHTML = '<div style="margin:24px;padding:20px;background:#18181b;border:1px solid #ef4444;border-radius:12px;color:#fca5a5;font-family:sans-serif;">' +
+                                        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">' +
+                                            '<span style="font-size:20px;">⚠️</span>' +
+                                            '<h3 style="margin:0;color:#ef4444;font-size:16px;font-weight:600;">Live Preview Error</h3>' +
+                                        '</div>' +
+                                        '<p style="margin:0 0 12px;font-size:13px;font-family:monospace;background:#09090b;padding:12px;border-radius:8px;white-space:pre-wrap;line-height:1.5;">' + (err.message || String(err)) + '</p>' +
+                                        '<button onclick="window.location.reload()" style="padding:6px 12px;background:#ef4444;color:#fff;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:500;">Reload Preview</button>' +
+                                    '</div>';
+                                }
                             }
                         });
-
-                        const {
-                            Car, Star, Shield, MapPin, Fuel, Calendar, Clock, Users, Check,
-                            ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Bell,
-                            User, Heart, Sparkles, Zap, Award, Info, AlertCircle, ArrowRight,
-                            ArrowLeft, Plus, Minus, Trash, Edit, Eye, EyeOff, Filter, RefreshCw
-                        } = LucideProxy;
-
-                        class ErrorBoundary extends React.Component {
-                            constructor(props) {
-                                super(props);
-                                this.state = { hasError: false, error: null };
-                            }
-                            static getDerivedStateFromError(error) {
-                                return { hasError: true, error };
-                            }
-                            componentDidCatch(error, info) {
-                                console.error("Preview render error:", error, info);
-                            }
-                            render() {
-                                if (this.state.hasError) {
-                                    return (
-                                        <div style={{ margin: '24px', padding: '20px', background: '#18181b', border: '1px solid #ef4444', borderRadius: '12px', color: '#fca5a5', fontFamily: 'sans-serif' }}>
-                                            <h3 style={{ margin: '0 0 8px', color: '#ef4444', fontSize: '15px', fontWeight: '600' }}>⚠️ Component Render Error</h3>
-                                            <p style={{ margin: '0 0 12px', fontSize: '13px', fontFamily: 'monospace', background: '#09090b', padding: '12px', borderRadius: '8px' }}>{this.state.error?.message || String(this.state.error)}</p>
-                                            <button onClick={() => window.location.reload()} style={{ padding: '6px 12px', background: '#ef4444', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '12px' }}>
-                                                Reload Preview
-                                            </button>
-                                        </div>
-                                    );
-                                }
-                                return this.props.children;
-                            }
-                        }
-
-                        // Sub-components
-                        ${subCodeBundled}
-
-                        // Main Component
-                        ${mainCodeCleaned}
-
-                        try {
-                            const rootEl = document.getElementById('root');
-                            if (typeof ${rootCompName} !== 'undefined') {
-                                ReactDOM.createRoot(rootEl).render(
-                                    <ErrorBoundary>
-                                        <${rootCompName} />
-                                    </ErrorBoundary>
-                                );
-                            } else {
-                                rootEl.innerHTML = '<div style="padding:40px;text-align:center;color:#94a3b8;">No export found in main component.</div>';
-                            }
-                        } catch (err) {
-                            document.getElementById('root').innerHTML = '<div style="padding:24px;color:#ef4444;font-family:monospace;background:#1e1e24;border-radius:8px;margin:20px;"><b>Preview Error:</b><br/>' + err.message + '</div>';
-                        }
                     </script>
                 </body>
                 </html>
