@@ -1,16 +1,40 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import { RotateCw, Globe, Code } from 'lucide-react'
+import { RotateCw, Globe, Code, ExternalLink, Sparkles } from 'lucide-react'
 
 function Preview({ tree }) {
+    // Detect whether project has React / Vite / package.json dependencies
+    const isReactOrServerProject = useMemo(() => {
+        let hasServerOrFramework = false
+        const check = (items = []) => {
+            for (const item of items) {
+                const name = (item.name || "").toLowerCase()
+                if (
+                    name === "package.json" ||
+                    name === "vite.config.js" ||
+                    name === "vite.config.ts" ||
+                    name.endsWith(".jsx") ||
+                    name.endsWith(".tsx")
+                ) {
+                    hasServerOrFramework = true
+                    return
+                }
+                if (item.children?.length) check(item.children)
+            }
+        }
+        check(tree)
+        return hasServerOrFramework
+    }, [tree])
+
     const [userModeOverride, setUserModeOverride] = useState(null)
-    const [serverUrl, setServerUrl] = useState("http://localhost:5175")
+    const [serverUrl, setServerUrl] = useState("http://localhost:5173")
     const [iframeKey, setIframeKey] = useState(0)
 
     useEffect(() => {
         setUserModeOverride(null)
     }, [tree])
 
-    const effectiveMode = userModeOverride || "static"
+    // Default to Localhost Dev Server for Vite/React projects (as user expects)
+    const effectiveMode = userModeOverride || (isReactOrServerProject ? "server" : "static")
 
     const handleReload = () => {
         setIframeKey(k => k + 1)
@@ -333,36 +357,79 @@ ${rawBundleCode}
 
     return (
         <div className='flex h-full w-full flex-col bg-white'>
-            <div className='flex h-10 shrink-0 items-center justify-between gap-3 border-b border-white/[0.06] bg-[#111113] px-3'>
+            <div className='flex h-11 shrink-0 items-center justify-between gap-3 border-b border-white/[0.06] bg-[#111113] px-3 pr-44'>
                 <div className='flex items-center gap-2 shrink-0'>
-                    <div className='h-2 w-2 rounded-full bg-emerald-400' />
-                    <span className='text-xs font-medium text-zinc-300'>
-                        {effectiveMode === "static" ? "Instant Live Preview" : "Dev Server Preview"}
-                    </span>
+                    <div className='flex items-center gap-1 rounded-md bg-white/[0.06] p-0.5 text-[11px]'>
+                        <button
+                            type="button"
+                            onClick={() => setUserModeOverride("server")}
+                            className={`flex items-center gap-1.5 rounded px-2.5 py-1 font-medium transition-colors cursor-pointer ${
+                                effectiveMode === "server" ? "bg-zinc-800 text-sky-400 shadow-sm" : "text-zinc-400 hover:text-zinc-200"
+                            }`}
+                        >
+                            <Globe size={12} />
+                            <span>Localhost (Dev Server)</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setUserModeOverride("static")}
+                            className={`flex items-center gap-1.5 rounded px-2.5 py-1 font-medium transition-colors cursor-pointer ${
+                                effectiveMode === "static" ? "bg-zinc-800 text-emerald-400 shadow-sm" : "text-zinc-400 hover:text-zinc-200"
+                            }`}
+                        >
+                            <Sparkles size={12} />
+                            <span>Live Preview</span>
+                        </button>
+                    </div>
                 </div>
 
                 {effectiveMode === "server" ? (
-                    <div className='flex max-w-sm flex-1 items-center gap-1.5 rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs'>
-                        <Globe size={13} className="text-zinc-500 shrink-0" />
+                    <div className='flex max-w-md flex-1 items-center gap-2 rounded-lg border border-white/10 bg-black/50 px-2.5 py-1 text-xs'>
+                        <Globe size={13} className="text-sky-400 shrink-0" />
                         <input
                             type="text"
                             value={serverUrl}
                             onChange={(e) => setServerUrl(e.target.value)}
-                            placeholder="http://localhost:5175"
-                            className="w-full bg-transparent text-zinc-200 outline-none text-[11px]"
+                            placeholder="http://localhost:5173"
+                            className="w-full bg-transparent text-zinc-100 outline-none text-[12px] font-mono"
                         />
-                        <button
-                            type="button"
-                            onClick={handleReload}
-                            title="Reload preview"
-                            className="rounded p-0.5 text-zinc-400 hover:text-white cursor-pointer"
-                        >
-                            <RotateCw size={12} />
-                        </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setServerUrl("http://localhost:5173")}
+                                className={`text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${serverUrl.includes("5173") ? "bg-sky-500/20 text-sky-300 font-bold" : "text-zinc-500 hover:text-zinc-300"}`}
+                            >
+                                5173
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setServerUrl("http://localhost:5175")}
+                                className={`text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${serverUrl.includes("5175") ? "bg-sky-500/20 text-sky-300 font-bold" : "text-zinc-500 hover:text-zinc-300"}`}
+                            >
+                                5175
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleReload}
+                                title="Reload preview"
+                                className="rounded p-1 text-zinc-400 hover:text-white cursor-pointer"
+                            >
+                                <RotateCw size={12} />
+                            </button>
+                            <a
+                                href={serverUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                title="Open in new tab"
+                                className="rounded p-1 text-zinc-400 hover:text-white cursor-pointer"
+                            >
+                                <ExternalLink size={12} />
+                            </a>
+                        </div>
                     </div>
                 ) : (
                     <div className='flex items-center gap-2 text-[11px] text-zinc-400'>
-                        <Code size={13} className="text-zinc-500" />
+                        <Code size={13} className="text-emerald-400" />
                         <span className="hidden sm:inline">Instant React + Tailwind Live Rendering</span>
                         <button
                             type="button"
@@ -374,27 +441,6 @@ ${rawBundleCode}
                         </button>
                     </div>
                 )}
-
-                <div className='flex items-center gap-1 rounded-md bg-white/[0.05] p-0.5 text-[11px] shrink-0'>
-                    <button
-                        type="button"
-                        onClick={() => setUserModeOverride("static")}
-                        className={`rounded px-2 py-0.5 font-medium transition-colors cursor-pointer ${
-                            effectiveMode === "static" ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-200"
-                        }`}
-                    >
-                        Live Preview
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setUserModeOverride("server")}
-                        className={`rounded px-2 py-0.5 font-medium transition-colors cursor-pointer ${
-                            effectiveMode === "server" ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-200"
-                        }`}
-                    >
-                        Dev Server
-                    </button>
-                </div>
             </div>
 
             <div className='min-h-0 flex-1 bg-white'>

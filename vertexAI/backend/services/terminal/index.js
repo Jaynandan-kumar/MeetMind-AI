@@ -156,6 +156,10 @@ io.on("connection", (socket) => {
 
             const { root } = await syncProject(projectId, userId)
 
+            const terminalBinPath = path.resolve(process.cwd(), "node_modules", ".bin")
+            const rootBinPath = path.resolve(process.cwd(), "..", "..", "node_modules", ".bin")
+            const customPath = `${terminalBinPath}${path.delimiter}${rootBinPath}${path.delimiter}${process.env.PATH || ""}`
+
             const ptyProcess = pty.spawn(SHELL, [], {
                 name: "xterm-256color",
                 cols,
@@ -163,6 +167,7 @@ io.on("connection", (socket) => {
                 cwd: root,
                 env: {
                     ...process.env,
+                    PATH: customPath,
                     FORCE_COLOR: "1",
                     NPM_CONFIG_AUDIT: "false",
                     NPM_CONFIG_FUND: "false",
