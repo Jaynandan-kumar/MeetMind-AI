@@ -1,0 +1,26 @@
+{
+  "name": "ai",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@langchain/core": "^1.2.18",
+    "@langchain/langgraph": "^1.5.1",
+    "@langchain/openrouter": "^0.4.17",
+    "axios": "^1.20.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "langchain": "^1.5.18",
+    "mongoose": "^8.9.5",
+    "nodemon": "^3.1.9",
+    "zod": "^4.6.7"
+  }
+}

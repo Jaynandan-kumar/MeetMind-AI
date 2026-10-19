@@ -1,0 +1,28 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="meetMindFaviconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5"/>
+      <stop offset="50%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+    <linearGradient id="aiSparkFaviconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Container -->
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#meetMindFaviconGrad)"/>
+
+  <!-- Camera Body -->
+  <rect x="13" y="19" width="24" height="26" rx="6" fill="#FFFFFF"/>
+
+  <!-- Camera Projector / Lens -->
+  <path d="M39 27.5C39 26.68 39.89 26.17 40.59 26.59L48.19 31.15C48.81 31.52 48.81 32.48 48.19 32.85L40.59 37.41C39.89 37.83 39 37.32 39 36.5V27.5Z" fill="#FFFFFF"/>
+
+  <!-- AI Neural Spark in Camera Center -->
+  <path d="M25 24C25 27.87 27.87 31 31 31C27.87 31 25 34.13 25 38C25 34.13 22.13 31 19 31C22.13 31 25 27.87 25 24Z" fill="url(#aiSparkFaviconGrad)"/>
+
+  <!-- Mini AI Sparkle Top Right Accent -->
+  <path d="M47 14C47 16 48.5 17.5 50.5 17.5C48.5 17.5 47 19 47 21C47 19 45.5 17.5 43.5 17.5C45.5 17.5 47 16 47 14Z" fill="#FFFFFF" fill-opacity="0.95"/>
+</svg>
