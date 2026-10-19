@@ -163,7 +163,11 @@ io.on("connection", (socket) => {
                 cwd: root,
                 env: {
                     ...process.env,
-                    FORCE_COLOR: "1"
+                    FORCE_COLOR: "1",
+                    NODE_OPTIONS: "--max-old-space-size=128",
+                    npm_config_audit: "false",
+                    npm_config_fund: "false",
+                    npm_config_prefer_offline: "true"
                 }
             })
 

@@ -103,6 +103,7 @@ console.log("[VertexAI Backend Runner] Booting all microservices...");
 services.forEach(svc => {
   const child = fork(svc.file, [], {
     cwd: svc.cwd,
+    execArgv: ["--max-old-space-size=48"],
     env: { ...process.env, ...svc.env }
   });
 
