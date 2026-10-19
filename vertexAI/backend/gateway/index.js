@@ -12,17 +12,19 @@ const port = process.env.PORT || 8000;
 const allowedOrigins = [
     process.env.FRONTEND_URL,
     "http://localhost:5173",
-    "http://127.0.0.1:5173"
+    "http://127.0.0.1:5173",
+    "https://meetmind-ide.vercel.app",
+    "https://meet-mind-ai-bice.vercel.app"
 ].filter(Boolean);
 
 const app = express();
 
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin) || origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) {
-            return callback(null, true);
+        if (!origin || allowedOrigins.includes(origin) || origin.endsWith(".vercel.app") || origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) {
+            return callback(null, origin || true);
         }
-        return callback(null, true);
+        return callback(null, origin || true);
     },
     credentials: true
 }));

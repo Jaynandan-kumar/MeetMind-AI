@@ -1,10 +1,13 @@
 {
-  "name": "backend",
+  "name": "vertexai-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "server.js",
   "type": "module",
-  "scripts": {},
+  "scripts": {
+    "start": "node server.js",
+    "postinstall": "npm --prefix gateway install && npm --prefix services/auth install && npm --prefix services/project install && npm --prefix services/file install && npm --prefix services/ai install && npm --prefix services/payment install"
+  },
   "dependencies": {
-    "ioredis": "^6.0.0"
+    "dotenv": "^16.4.7"
   }
 }
