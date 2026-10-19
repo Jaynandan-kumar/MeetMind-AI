@@ -252,10 +252,20 @@ function Preview({ tree }) {
                     <meta charset="UTF-8" />
                     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                     <script src="https://cdn.tailwindcss.com"></script>
+                    <script type="importmap">
+                    {
+                        "imports": {
+                            "react": "https://esm.sh/react@18.3.1?dev",
+                            "react-dom": "https://esm.sh/react-dom@18.3.1?dev",
+                            "react-dom/client": "https://esm.sh/react-dom@18.3.1/client?dev",
+                            "lucide-react": "https://esm.sh/lucide-react@0.475.0?dev",
+                            "prop-types": "https://esm.sh/prop-types@15.8.1?dev"
+                        }
+                    }
+                    </script>
                     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
                     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
                     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-                    <script src="https://unpkg.com/lucide@latest"></script>
                     <style>
                         body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #09090b; color: #f4f4f5; }
                         ${css}
@@ -265,7 +275,7 @@ function Preview({ tree }) {
                             var root = document.getElementById('root');
                             if (root && (!root.innerHTML || root.innerHTML.trim() === '')) {
                                 root.innerHTML = '<div style="margin:20px;padding:20px;background:#18181b;border:1px solid #ef4444;border-radius:10px;color:#fca5a5;font-family:sans-serif;">' +
-                                    '<h3 style="margin:0 0 8px;color:#ef4444;font-size:15px;font-weight:600;">⚠️ Script Execution Error</h3>' +
+                                    '<h3 style="margin:0 0 8px;color:#ef4444;font-size:15px;font-weight:600;">⚠️ Preview Error</h3>' +
                                     '<p style="margin:0;font-size:13px;font-family:monospace;background:#09090b;padding:12px;border-radius:6px;white-space:pre-wrap;">' + (err ? err.message : msg) + '</p>' +
                                 '</div>';
                             }
@@ -275,40 +285,8 @@ function Preview({ tree }) {
                 <body>
                     <div id="root"></div>
 
-                    <script id="preview-bundle-source" type="text/plain">
+                    <script type="text/babel" data-type="module" data-presets="react">
 ${rawBundleCode}
-                    </script>
-
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function() {
-                            var rootEl = document.getElementById('root');
-                            try {
-                                var source = document.getElementById('preview-bundle-source').textContent;
-                                var compiled = Babel.transform(source, {
-                                    presets: ['react', 'env'],
-                                    filename: 'preview-bundle.jsx'
-                                }).code;
-
-                                var runner = new Function('React', 'ReactDOM', 'LucideProxy', 'require', compiled);
-                                runner(React, ReactDOM, LucideProxy, function(mod) {
-                                    if (mod === 'react') return React;
-                                    if (mod && String(mod).indexOf('lucide') !== -1) return LucideProxy;
-                                    return {};
-                                });
-                            } catch (err) {
-                                console.error("Preview Bundle Error:", err);
-                                if (rootEl) {
-                                    rootEl.innerHTML = '<div style="margin:24px;padding:20px;background:#18181b;border:1px solid #ef4444;border-radius:12px;color:#fca5a5;font-family:sans-serif;">' +
-                                        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">' +
-                                            '<span style="font-size:20px;">⚠️</span>' +
-                                            '<h3 style="margin:0;color:#ef4444;font-size:16px;font-weight:600;">Live Preview Error</h3>' +
-                                        '</div>' +
-                                        '<p style="margin:0 0 12px;font-size:13px;font-family:monospace;background:#09090b;padding:12px;border-radius:8px;white-space:pre-wrap;line-height:1.5;">' + (err.message || String(err)) + '</p>' +
-                                        '<button onclick="window.location.reload()" style="padding:6px 12px;background:#ef4444;color:#fff;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:500;">Reload Preview</button>' +
-                                    '</div>';
-                                }
-                            }
-                        });
                     </script>
                 </body>
                 </html>
