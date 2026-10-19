@@ -72,6 +72,16 @@ const services = [
     }
   },
   {
+    name: "terminal",
+    file: path.resolve(__dirname, "services/terminal/index.js"),
+    cwd: path.resolve(__dirname, "services/terminal"),
+    env: {
+      PORT: "8005",
+      FILE_SERVICE_URL: "http://localhost:8003",
+      MONGODB_URI: process.env.MONGODB_TERMINAL_URI || `${MONGODB_BASE}/terminal`
+    }
+  },
+  {
     name: "gateway",
     file: path.resolve(__dirname, "gateway/index.js"),
     cwd: path.resolve(__dirname, "gateway"),
