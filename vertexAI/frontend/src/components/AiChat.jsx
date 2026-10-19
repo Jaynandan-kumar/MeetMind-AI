@@ -228,11 +228,16 @@ function AiChat({ projectId, history = [], reloadTree, width = 340 }) {
             let msg = message
             setMessage("")
             history = messages
+            const sessionId = localStorage.getItem("vertex_session_id") || localStorage.getItem("token") || ""
             const response = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/ai/chat`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Accept: "text/event-stream"
+                    Accept: "text/event-stream",
+                    ...(sessionId ? {
+                        "Authorization": `Bearer ${sessionId}`,
+                        "x-session-id": sessionId
+                    } : {})
                 },
                 credentials: 'include',
                 body: JSON.stringify({
