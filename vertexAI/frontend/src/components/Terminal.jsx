@@ -9,6 +9,20 @@ function Terminal({ projectId, userId }) {
     const containerRef = useRef(null)
     const terminalRef = useRef(null)
     const [connected, setConnected] = useState(false)
+    const [mode, setMode] = useState(() => {
+        try {
+            return localStorage.getItem("vertex_terminal_mode") || "cloud"
+        } catch {
+            return "cloud"
+        }
+    })
+
+    const handleSwitchMode = (newMode) => {
+        setMode(newMode)
+        try {
+            localStorage.setItem("vertex_terminal_mode", newMode)
+        } catch {}
+    }
 
     useEffect(() => {
         if (!projectId || !userId) return;
@@ -41,7 +55,8 @@ function Terminal({ projectId, userId }) {
         }
         fitTerminal()
 
-        const terminal_url = import.meta.env.VITE_TERMINAL_SERVICE_URL
+        const cloudUrl = import.meta.env.VITE_TERMINAL_SERVICE_URL || "https://vertexai-backend-jdqb.onrender.com"
+        const terminal_url = mode === "local" ? "http://localhost:8005" : cloudUrl
 
         if (!terminal_url) {
             terminal.write("\r\n\x1b[31mVITE_TERMINAL_SERVICE_URL missing\x1b[0m\r\n")
@@ -105,7 +120,11 @@ function Terminal({ projectId, userId }) {
         socket.on("connect_error", () => {
             setConnected(false)
             if (!hasShownError) {
-                terminal.write("\r\n\x1b[33m[Connecting to cloud terminal...]\x1b[0m\r\n")
+                if (mode === "local") {
+                    terminal.write("\r\n\x1b[33m[My PC Terminal: Start local service on port 8005 (or switch to ☁️ Cloud)]\x1b[0m\r\n")
+                } else {
+                    terminal.write("\r\n\x1b[33m[Connecting to cloud terminal...]\x1b[0m\r\n")
+                }
                 hasShownError = true
             }
         })
@@ -122,7 +141,7 @@ function Terminal({ projectId, userId }) {
             socket.disconnect()
             terminal.dispose()
         }
-    }, [projectId, userId])
+    }, [projectId, userId, mode])
 
     const clearTerminal = () => {
         const terminal = terminalRef.current
@@ -135,7 +154,7 @@ function Terminal({ projectId, userId }) {
     return (
         <div className='flex h-full flex-col bg-[#0d0d0f]'>
             <div className='flex h-7 shrink-0 items-center justify-between border-b border-white/[0.05] px-3'>
-                <div className='flex items-center gap-2'>
+                <div className='flex items-center gap-2.5'>
                     <span className={`h-1.5 w-1.5 rounded-full ${
                         connected
                             ? "bg-emerald-400"
@@ -144,9 +163,31 @@ function Terminal({ projectId, userId }) {
                     />
                     <span className="text-[11px] text-zinc-400">
                         {connected
-                            ? "terminal - connected"
-                            : "terminal - connecting..."}
+                            ? `terminal (${mode === "local" ? "My PC" : "Cloud"}) - connected`
+                            : `terminal (${mode === "local" ? "My PC" : "Cloud"}) - connecting...`}
                     </span>
+                    <div className='flex items-center gap-0.5 rounded bg-white/[0.05] p-0.5 text-[10px] ml-1'>
+                        <button
+                            type="button"
+                            onClick={() => handleSwitchMode("cloud")}
+                            className={`rounded px-1.5 py-0.5 transition-colors cursor-pointer ${
+                                mode === "cloud" ? "bg-sky-500/20 text-sky-300 font-semibold" : "text-zinc-500 hover:text-zinc-300"
+                            }`}
+                            title="Cloud container terminal"
+                        >
+                            ☁️ Cloud
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleSwitchMode("local")}
+                            className={`rounded px-1.5 py-0.5 transition-colors cursor-pointer ${
+                                mode === "local" ? "bg-emerald-500/20 text-emerald-300 font-semibold" : "text-zinc-500 hover:text-zinc-300"
+                            }`}
+                            title="Connect to local PC terminal (port 8005)"
+                        >
+                            💻 My PC
+                        </button>
+                    </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <button

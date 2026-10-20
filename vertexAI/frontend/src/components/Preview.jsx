@@ -168,6 +168,18 @@ function Preview({ tree }) {
                 });
                 window.PropTypes = PropTypes;
 
+                // Safe fallbacks for common undeclared variables/components in AI generated templates
+                var activeFilter = "All";
+                var setActiveFilter = function(f) { activeFilter = f; };
+                var filteredVehicles = [];
+                var FilterPill = window.FilterPill || function FilterPillComponent(props) {
+                    return React.createElement('button', {
+                        type: 'button',
+                        className: 'px-3 py-1 rounded-full text-xs font-medium border border-white/10 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer ' + (props.active ? 'bg-sky-500/20 text-sky-400 border-sky-500/40' : 'text-zinc-400'),
+                        onClick: props.onClick
+                    }, props.label || props.children);
+                };
+
                 // Universal Lucide SVG Proxy
                 const LucideProxy = new Proxy({}, {
                     get: (target, prop) => {
