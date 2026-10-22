@@ -13,3 +13,6 @@ MeetMind AI is a full-stack real-time video conferencing, collaboration, and clo
 - `/client`: MeetMind React + Vite frontend application.
 - `/server`: MeetMind Express + Socket.IO WebRTC signaling backend.
 - `/vertexAI`: Cloud IDE frontend and backend microservices suite.
+
+LIVE : https://meet-mind-ai-bice.vercel.app/login
+
